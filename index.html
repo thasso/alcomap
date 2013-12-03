@@ -1,0 +1,112 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <!--[if lte IE 8]>
+        <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.ie.css" />
+        <![endif]-->
+        <script src="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.js"></script>
+        <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script> 
+        <script src="QuadTree.js"></script>
+        <script src="L.TileLayer.MaskCanvas.js"></script>
+    </head>
+    <body>
+        <div id="map" style="width:100%; height: 100%;"></div>
+        <script type="text/javascript">
+            function init(){
+                var map = L.map('map').setView([41.0096334, 28.9651646], 13);
+                var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+                var osmAttrib='Map data © OpenStreetMap contributors';
+                var osm = new L.TileLayer(osmUrl, {minZoom: 8, maxZoom: 20, attribution: osmAttrib});
+                osm.addTo(map);
+
+                var masked_layer = L.TileLayer.maskCanvas({
+                    radius: 100,  // radius in pixels or in meters (see useAbsoluteRadius)
+                    useAbsoluteRadius: true,  // true: r in meters, false: r in pixels
+                    color: '#A00',  // the color of the layer
+                    opacity: 0.5,  // opacity of the not covered area
+                    noMask: true,  // true results in normal (filled) circled, instead masked circles
+                    lineColor: '#A00'   // color of the circle outline if noMask is true
+                });
+                var save_layer = L.TileLayer.maskCanvas({
+                    radius: 100,  // radius in pixels or in meters (see useAbsoluteRadius)
+                    useAbsoluteRadius: true,  // true: r in meters, false: r in pixels
+                    color: '#990',  // the color of the layer
+                    opacity: 0.2,  // opacity of the not covered area
+                    noMask: false,  // true results in normal (filled) circled, instead masked circles
+                    lineColor: '#A00'   // color of the circle outline if noMask is true
+                });
+                var schools = L.layerGroup([]);
+                var mosques = L.layerGroup([]);
+                map.addLayer(schools);
+                map.addLayer(mosques);
+                map.addLayer(masked_layer);
+                map.addLayer(save_layer);
+                var base = {
+                };
+                var overlays = {
+                    "Green Zone": save_layer,
+                    "Red Zone": masked_layer,
+                    "Schools": schools,
+                    "Mosques": mosques
+                };
+                L.control.layers(base, overlays, {"collapsed": false}).addTo(map);
+
+                var masked = [];
+                // query
+                var load = function(name, color, masked, layer){
+                    $.ajax({url: name}).done(function(data){
+                        for(var i=0; i<data.elements.length; i++){
+                            var e = data.elements[i];
+                            masked.push([e.lat, e.lon]);
+                            var circle = L.circle([e.lat, e.lon], 100, {
+                                color: color,
+                                stroke: false,
+                                fillColor: color,
+                                fillOpacity: 0.5
+                            });
+                            layer.addLayer(circle);
+                            circle.bindPopup(e.name);
+                        }
+                        masked_layer.setData(masked);
+                        save_layer.setData(masked);
+                    });
+                };
+                load('schools.json', 'red', masked, schools);
+                load('mosques.json', 'blue', masked, mosques);
+                if(navigator.geolocation){
+                    var locationMarker = null;
+                    navigator.geolocation.getCurrentPosition(
+                        function(position){
+                            if (locationMarker){
+                                return;
+                            }
+    
+                            // Log that this is the initial position.
+                            console.log( "Initial Position Found" );
+    
+                            // Add a marker to the map using the position.
+                            locationMarker = L.marker(
+                                [position.coords.latitude,
+                                position.coords.longitude]
+                            ).addTo(map)
+                        }, 
+                        function( error ){
+                            console.log( "Something went wrong: ", error );
+                        },
+                        {
+                            timeout: (5 * 1000),
+                            maximumAge: (1000 * 60 * 15),
+                            enableHighAccuracy: true 
+                        }
+                    );
+                }
+ 
+            }
+
+            $(function(){
+                init();
+            });
+        </script>
+    </body>
+</html
